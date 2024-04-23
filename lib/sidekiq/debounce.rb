@@ -38,7 +38,13 @@ module Sidekiq
     end
 
     def debounce_key
-      hash = Digest::MD5.hexdigest(@msg['args'].to_json)
+      debounce_args =
+        if debounce_options.is_a?(Hash) && debounce_options[:by].respond_to?(:call)
+          debounce_options[:by].call(@msg['args'])
+        else
+          @msg['args']
+        end
+      hash = Digest::MD5.hexdigest(debounce_args.to_json)
       @debounce_key ||= "sidekiq_debounce:#{@worker.name}:#{hash}"
     end
 
@@ -53,7 +59,11 @@ module Sidekiq
     end
 
     def debounce?
-      (@msg['at'] && @worker.get_sidekiq_options['debounce']) || false
+      (@msg['at'] && debounce_options) || false
+    end
+
+    def debounce_options
+      @worker.get_sidekiq_options['debounce']
     end
   end
 end
